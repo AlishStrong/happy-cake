@@ -9,6 +9,7 @@ const REQUEST_BODY_KEY = process.env.REQUEST_BODY_KEY ?? '';
 
 const cakeryApiHeaders: CakeryApiHeaders = new AxiosHeaders({
     Authorization: AUTHORIZATION_KEY,
+    Accept: 'text/html; charset=utf-8',
     'Content-Type': 'application/json'
 }) as CakeryApiHeaders;
 

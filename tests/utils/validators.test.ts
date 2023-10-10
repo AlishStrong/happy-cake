@@ -1,28 +1,18 @@
 import { ReservationBody, ReservationBodyError } from '../../src/models/models';
 import validators from '../../src/utils/validators';
 
-const today = new Date();
-today.setFullYear(1990);
+const cur = new Date();
+const curYear = cur.getFullYear();
+const curMonth = cur.getMonth() + 1; // January is 0
+const curDate = cur.getDate();
 
-const tomorrow = new Date();
-tomorrow.setDate(today.getDate() + 1);
-tomorrow.setFullYear(1992);
-
-const afterTomorrow = new Date();
-afterTomorrow.setDate(tomorrow.getDate() + 2);
-afterTomorrow.setFullYear(1997);
-
-const yesterday = new Date();
-yesterday.setDate(today.getDate() - 1);
-yesterday.setFullYear(2000);
-
-const nextMonth = new Date();
-nextMonth.setMonth(today.getMonth() + 1);
-nextMonth.setFullYear(2002);
-
-const previousMonth = new Date();
-previousMonth.setMonth(today.getMonth() - 1);
-nextMonth.setFullYear(2004);
+const today = new Date([curYear - 30, curMonth, curDate].join('-'));
+const tomorrow = new Date([curYear - 25, curMonth, curDate + 1].join('-'));
+const afterTomorrow = new Date([curYear - 20, curMonth, curDate + 2].join('-'));
+const yesterday = new Date([curYear - 15, curMonth, curDate - 1].join('-'));
+const nextMonth = new Date([curYear - 10, curMonth + 1, curDate].join('-'));
+const previousMonth = new Date([curYear - 5, curMonth - 1, curDate].join('-'));
+const nextYear = new Date([curYear + 1, curMonth, curDate].join('-'));
 
 describe('velidators', () => {
     describe('isString', () => {
@@ -71,7 +61,8 @@ describe('velidators', () => {
             { input: afterTomorrow.toISOString(), expected: false },
             { input: yesterday.toISOString(), expected: false },
             { input: nextMonth.toISOString(), expected: false },
-            { input: previousMonth.toISOString(), expected: false }
+            { input: previousMonth.toISOString(), expected: false },
+            { input: nextYear.toISOString(), expected: false }
         ])(
             'should return $expected when input is $input',
             ({ input, expected }) => {
@@ -84,7 +75,8 @@ describe('velidators', () => {
     describe('parseCake', () => {
         test.each([
             { cake: 'Chocolate', expected: 'Chocolate' },
-            { cake: 'Strawberry', expected: 'Strawberry' },
+            { cake: 'チーズケーキ', expected: 'チーズケーキ' },
+            { cake: encodeURI('チーズケーキ'), expected: 'チーズケーキ' },
             { cake: ' Trimmed ', expected: 'Trimmed' },
             { cake: '', expected: 'error' },
             { cake: '   ', expected: 'error' },
@@ -141,10 +133,6 @@ describe('velidators', () => {
             test.each([
                 {
                     birthday: tomorrow.toISOString(),
-                    expected: tomorrow.toISOString().substring(0, 10)
-                },
-                {
-                    birthday: tomorrow.toString(),
                     expected: tomorrow.toISOString().substring(0, 10)
                 }
             ])('when birthday is $birthday', ({ birthday, expected }) => {

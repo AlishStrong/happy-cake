@@ -1,3 +1,5 @@
+import { OutgoingHttpHeaders } from 'http';
+
 export type DeliveryCity = 'helsinki' | 'espoo' | 'vantaa';
 
 export interface ReservationBody {
@@ -20,4 +22,20 @@ export enum ReservationBodyError {
     CITY_NAME = 'Delivery can be made only to Helsinki, Espoo, or Vantaa',
     CITY = "Incorrect or missing recipient's city",
     MESSAGE = 'Unsupported or unsafe message format'
+}
+
+export interface ClientData {
+    clientId: string;
+    reservationBody?: ReservationBody;
+}
+
+export interface SseHeaders extends OutgoingHttpHeaders {
+    'Content-Type': 'text/event-stream';
+    Connection: 'keep-alive';
+    'Cache-control': 'no-cache';
+}
+
+export interface MessageForClient {
+    status: 'processing' | 'success' | 'error';
+    message: string;
 }

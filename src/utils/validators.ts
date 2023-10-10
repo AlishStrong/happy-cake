@@ -13,16 +13,23 @@ const isDate = (date: string): boolean => {
 };
 
 const isNextDay = (birthday: string): boolean => {
-    const currentDate = new Date();
-    const birthdayDate = new Date(birthday);
-    birthdayDate.setFullYear(currentDate.getFullYear());
-    const oneDayInMs = 24 * 60 * 60 * 1000;
-    const difference = birthdayDate.getTime() - currentDate.getTime();
-    return (
-        birthdayDate.getDate() !== currentDate.getDate() &&
-        difference > 0 &&
-        difference <= oneDayInMs
-    );
+    const current = new Date();
+    const curYear = current.getFullYear();
+    const curMonth = current.getMonth() + 1; // January is 0
+    const curDate = current.getDate();
+
+    const [bYear, bMonth, bDay] = birthday.substring(0, 10).split('-');
+
+    if (+bYear >= curYear) {
+        return false;
+    } else {
+        const zeroCurrent = new Date([curYear, curMonth, curDate].join('-'));
+        const zeroBirthday = new Date([curYear, bMonth, bDay].join('-'));
+        const oneDayInMs = 24 * 60 * 60 * 1000;
+        const difference = zeroBirthday.getTime() - zeroCurrent.getTime();
+
+        return difference > 0 && difference <= oneDayInMs;
+    }
 };
 
 const parseCake = (cake: unknown): string => {
@@ -30,7 +37,7 @@ const parseCake = (cake: unknown): string => {
         throw new Error(ReservationBodyError.CAKE);
     }
 
-    return cake.trim();
+    return decodeURI(cake.trim());
 };
 
 const parseName = (name: unknown): string => {
@@ -47,7 +54,7 @@ const parseBirthday = (birthday: unknown): string => {
     } else if (!isNextDay(birthday)) {
         throw new Error(ReservationBodyError.BIRTHDAY);
     }
-    return new Date(birthday).toISOString().substring(0, 10);
+    return new Date(birthday.substring(0, 10)).toISOString().substring(0, 10);
 };
 
 const parseAddress = (address: unknown): string => {

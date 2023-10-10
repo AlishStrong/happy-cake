@@ -6,7 +6,8 @@ export interface Cake {
 }
 
 export interface CakeData {
-    data: Cake[];
+    data?: Cake[]; // present if GET request to /cakes responded with status 200
+    message?: string; // present if GET request to /cakes responded with status 500
 }
 
 export interface CakeryApiRequestBody {
@@ -22,4 +23,20 @@ export interface CakeryApiHeaders extends AxiosHeaders {
     'Content-Type': 'application/json';
 }
 
-export interface CakeryApiResponse extends AxiosResponse<CakeData> {}
+export type CakeryApiCakesResponse = AxiosResponse<CakeData>;
+
+export interface CakeOrder {
+    order_id: string;
+}
+
+export interface OrderData {
+    data?: CakeOrder; // present if POST request to /orders responded with status 200
+    message?: string; // present if POST request to /orders responded with status 500
+}
+
+export type CakeryApiOrdersResponse = AxiosResponse<OrderData>;
+
+export enum CakeryApiErrors {
+    TOO_MANY = 'Cakery API is overloaded with requests and returned 429',
+    DEAD = 'Issue with Cakery API (probably dead)'
+}
