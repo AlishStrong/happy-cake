@@ -1,26 +1,23 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
-import config from '../utils/cakery-api.config';
-import {
-    CakeryApiPostRequestBody,
-    CakeryApiOrdersResponse,
-    OrderData,
-    CakeryApiErrors
-} from '../models/cakery-api.models';
 import {
     ClientData,
+    ClientDataForPost,
     MessageForClient,
     ReservationBody
 } from '../models/models';
 import validators from '../utils/validators';
 import { v4 as uuidv4 } from 'uuid';
 import sse from '../utils/sse';
-import requestLimiterService, {
-    ClientRequestData
-} from '../services/request-limiter.service';
+import requestLimiterService from '../services/request-limiter.service';
+import { ClientRequestData } from '../models/request-limiter.models';
+import { CakeryEndpoint } from '../models/cakery-api.models';
 
-const cakeryApiHeaders = config.cakeryApiHeaders;
-
+/**
+ * Because the communication is asynchronous using SSE,
+ * the application needs to keep track of clients.
+ * Once Cakery API responses, the application will find the right client
+ * and forward a message using SSE
+ */
 const clients: ClientData[] = [];
 
 const removeClient = (clientId: string) => {
@@ -30,12 +27,64 @@ const removeClient = (clientId: string) => {
     }
 };
 
-const checkCakeStock = (request: Request, response: Response): void => {
-    // Step 1: check that the request has headers "Accept: text/event-stream" needed for SSE
+const checkAcceptHeaders = (request: Request) => {
     const acceptHeader = request.header('Accept');
     if (!acceptHeader || acceptHeader !== 'text/event-stream') {
         throw new Error(JSON.stringify(['Missing request headers']));
     }
+};
+
+const registerListeners = (
+    clientId: string,
+    request: Request,
+    response: Response
+) => {
+    request.on('close', () => {
+        removeClient(clientId);
+    });
+    response.on('finish', () => {
+        removeClient(clientId);
+    });
+};
+
+const getClient = (clientId: string) => {
+    const foundClient = clients.find((c) => c.clientId === clientId);
+    if (!foundClient) {
+        throw new Error(JSON.stringify(['Unknown client request']));
+    } else if ('status' in foundClient) {
+        if (foundClient.status === 'processed') {
+            throw new Error(
+                JSON.stringify(['Request is already under processing'])
+            );
+        } else {
+            foundClient.status = 'processed';
+            clients.splice(
+                clients.findIndex((c) => c.clientId === clientId),
+                1,
+                foundClient
+            );
+            return foundClient;
+        }
+    } else {
+        return foundClient;
+    }
+};
+
+/**
+ * Handle requests for checking the stock of cakes.
+ *
+ * @param Request must include 'Accept: text/event-stream' headers.
+ *
+ * Responses to client with real-time messages @see MessageForClient via SSE.
+ * Messages are stringified JSONs and need to be parsed by the client.
+ * When status of message is 'processing', client must keep the SSE channel open.
+ * When status of message is 'success' or 'error', client needs to process the message-field and close the channel.
+ *
+ * Includes listeners for automatic SSE channel closure in case the client faces problems
+ */
+const checkCakeStock = (request: Request, response: Response): void => {
+    // Step 1: check that the request has headers "Accept: text/event-stream" needed for SSE
+    checkAcceptHeaders(request);
 
     // Step 2: generate request client ID
     const clientId = uuidv4();
@@ -57,22 +106,29 @@ const checkCakeStock = (request: Request, response: Response): void => {
     response.write(sse.toSseData(messageForClient));
 
     // Step 6: Register listeners for filtering clients when SSE closes
-    request.on('close', () => {
-        removeClient(clientId);
-    });
-    response.on('finish', () => {
-        removeClient(clientId);
-    });
+    registerListeners(clientId, request, response);
 
     // Step 7: get cakes data from Cakery API
     const requestData: ClientRequestData = {
         clientId,
-        requestType: 'cakes',
+        requestType: CakeryEndpoint.CAKES,
         responseObj: response
     };
     requestLimiterService.handleRequest(requestData);
 };
 
+/**
+ * PART 1 of the Cake Reservation process
+ * Notify application about an intent to reserve a cake.
+ *
+ * @param Request body must include @see ReservationBody
+ *
+ * Responses with a redirect url that contains generated client ID.
+ * If client receives a response of status 303,
+ * it must make a subsequent GET request to the redirect url.
+ * Browser clients can open an SSE channel only via GET requests!
+ * After that the process's PART 2 will continue by @see reserveCakeSse
+ */
 const reserveCake = (request: Request, response: Response): void => {
     // Step 1: check request body
     const reservationBody: ReservationBody = validators.toReservationBody(
@@ -83,9 +139,10 @@ const reserveCake = (request: Request, response: Response): void => {
     const clientId = uuidv4();
 
     // Step 3: add reservation body and client ID to an array of clients
-    const clientData: ClientData = {
+    const clientData: ClientDataForPost = {
         clientId,
-        reservationBody
+        reservationBody,
+        status: 'initialized'
     };
     clients.push(clientData);
 
@@ -93,19 +150,27 @@ const reserveCake = (request: Request, response: Response): void => {
     response.redirect(303, '/reserve/' + clientId);
 };
 
+/**
+ * PART 2 of the Cake Reservation process; for PART 1 @see reserveCake
+ * Make a cake order via Cakery API and notify the client via SSE.
+ *
+ * @param Request must include 'Accept: text/event-stream' headers.
+ * @param Request must include client ID path parameter.
+ *
+ * Responses to client with real-time messages @see MessageForClient via SSE.
+ * Messages are stringified JSONs and need to be parsed by the client.
+ * When status of message is 'processing', client must keep the SSE channel open.
+ * When status of message is 'success' or 'error', client needs to process the message-field and close the channel.
+ *
+ * Includes listeners for automatic SSE channel closure in case the client faces problems
+ */
 const reserveCakeSse = (request: Request, response: Response): void => {
     // Step 5: check that the request has headers "Accept: text/event-stream" needed for SSE
-    const acceptHeader = request.header('Accept');
-    if (!acceptHeader || acceptHeader !== 'text/event-stream') {
-        throw new Error(JSON.stringify(['Missing request headers']));
-    }
+    checkAcceptHeaders(request);
 
     // Step 6: check that the client ID is valid
     const clientId = request.params.id;
-    const foundClient = clients.find((c) => c.clientId === clientId);
-    if (!foundClient) {
-        throw new Error(JSON.stringify(['Unknown client request']));
-    }
+    const foundClient = getClient(clientId) as ClientDataForPost;
 
     // Step 7: prepare SSE channel to the client
     response.writeHead(200, sse.headers);
@@ -118,63 +183,16 @@ const reserveCakeSse = (request: Request, response: Response): void => {
     response.write(sse.toSseData(messageForClient));
 
     // Step 9: Register listeners for filtering clients when SSE closes
-    request.on('close', () => {
-        removeClient(clientId);
-    });
-    response.on('finish', () => {
-        removeClient(clientId);
-    });
+    registerListeners(clientId, request, response);
 
-    // Step 10: make the order reservation request of the client to Cakery API /orders
-    axios
-        .post<OrderData, CakeryApiOrdersResponse, CakeryApiPostRequestBody>(
-            config.cakeryUrl + 'orders',
-            {
-                ...config.cakeryApiGetRequestData,
-                cake: foundClient.reservationBody!.cake
-            },
-            {
-                headers: cakeryApiHeaders
-            }
-        )
-        .then((r) => {
-            // Step 11: process the response from Cakery API
-            const messageForClient: MessageForClient = {
-                status: 'processing',
-                message: 'something weird happened!'
-            };
-            if (r.status === 200) {
-                messageForClient.status = 'success';
-                messageForClient.message = r.data.data!.order_id;
-            } else if (r.status === 500) {
-                messageForClient.status = 'error';
-                messageForClient.message = r.data.message!;
-            } else if (r.status === 429) {
-                messageForClient.status = 'error';
-                messageForClient.message = CakeryApiErrors.TOO_MANY;
-            } else {
-                messageForClient.status = 'error';
-                messageForClient.message = `${CakeryApiErrors.DEAD}. It returned ${r.status}`;
-            }
-
-            // Step 12: notify client; client must close SSE once status is 'success' OR 'error'
-            response.write(sse.toSseData(messageForClient));
-        })
-        .catch((e) => {
-            console.error(e);
-            throw new Error(
-                JSON.stringify([`${CakeryApiErrors.DEAD}. Please check logs`])
-            );
-        })
-        .finally(() => {
-            // Step 13: remove client from the list
-            removeClient(clientId);
-
-            // manually shut SSE in case client did not do so
-            setTimeout(() => {
-                response.end();
-            }, 3000);
-        });
+    // Step 10: order a cake from Cakery API
+    const requestData: ClientRequestData = {
+        clientId,
+        requestType: CakeryEndpoint.ORDER,
+        responseObj: response,
+        cake: foundClient.reservationBody.cake
+    };
+    requestLimiterService.handleRequest(requestData);
 };
 
 export default {

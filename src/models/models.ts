@@ -24,10 +24,15 @@ export enum ReservationBodyError {
     MESSAGE = 'Unsupported or unsafe message format'
 }
 
-export interface ClientData {
+interface ClientDataForGet {
     clientId: string;
-    reservationBody?: ReservationBody;
 }
+
+export interface ClientDataForPost extends ClientDataForGet {
+    status: 'initialized' | 'processed'; // to prevent double processing
+    reservationBody: ReservationBody;
+}
+export type ClientData = ClientDataForGet | ClientDataForPost;
 
 export interface SseHeaders extends OutgoingHttpHeaders {
     'Content-Type': 'text/event-stream';

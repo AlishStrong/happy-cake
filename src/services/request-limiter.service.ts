@@ -1,3 +1,24 @@
+/**
+ * Special service for limiting the total number of requests per second made by this application to Cakery API.
+ * The limit is specified by {@link RATE_LIMIT}
+ *
+ * Requests to Cakery API are passed to @see handleRequest function.
+ * When it is called, the function first checks if @see processedRequests array has space.
+ * @see processedRequests array's length can by maximum of @see RATE_LIMIT value.
+ * If that is true, the call is made to Cakery API via @see callCakeryApi
+ * and call's promise with other metadata as a whole are added to @see processedRequests
+ * Else, the request is pushed to @see queue via @see queueRequest function.
+ *
+ * The call's promise is processed by @see processCakeryApiResponse function.
+ * When the promise resolves/rejects, client will receive a message via SSE.
+ * The function will also remove the request's data from the @see processedRequests array
+ * and take the next available request from the @see queue via @see takeRequestFromQueue
+ *
+ * The @see takeRequestFromQueue function takes a request element from the end of the @see queue array
+ * and removes that element from that array.
+ * It then calls @see handleRequest function with the taken request and the process repeats.
+ */
+
 import axios from 'axios';
 import {
     Cake,
@@ -8,48 +29,45 @@ import {
     CakeryApiOrdersResponse,
     CakeryApiPostRequestBody,
     CakeryApiRequestBody,
+    CakeryApiResponse,
+    CakeryEndpoint,
     OrderData
 } from '../models/cakery-api.models';
 import config from '../utils/cakery-api.config';
 import { MessageForClient } from '../models/models';
 import sse from '../utils/sse';
-import { Response } from 'express';
+import {
+    ClientRequestData,
+    ProcessedRequest
+} from '../models/request-limiter.models';
 
 const RATE_LIMIT = 60;
 const processedRequests: ProcessedRequest[] = [];
 const queue: ClientRequestData[] = [];
 
-interface ProcessedRequest {
-    clientId: string;
-    promise: Promise<CakeryApiResponse>;
-}
+const handleRequest = (requestData: ClientRequestData) => {
+    if (processedRequests.length < RATE_LIMIT) {
+        // make the request to Cakery API
+        const cakeryPromise = callCakeryApi(requestData);
 
-interface ClientRequestDataBase {
-    clientId: string;
-    responseObj: Response;
-}
+        // put the promise to the list of processed requests
+        // for controlling the request rate to Cakery API
+        processedRequests.push({
+            clientId: requestData.clientId,
+            promise: cakeryPromise
+        });
 
-interface ClientGetRequestData extends ClientRequestDataBase {
-    requestType: 'cakes';
-}
-
-interface ClientPostRequestData extends ClientRequestDataBase {
-    requestType: 'order';
-    cake: string;
-}
-
-export type ClientRequestData = ClientGetRequestData | ClientPostRequestData;
-
-type CakeryApiResponse = CakeryApiCakesResponse | CakeryApiOrdersResponse;
-
-const queueRequest = (requestData: ClientRequestData) => {
-    queue.push(requestData);
+        processCakeryApiResponse(cakeryPromise, requestData);
+    } else {
+        // queue the request
+        queueRequest(requestData);
+    }
 };
 
 const callCakeryApi = (
     requestData: ClientRequestData
 ): Promise<CakeryApiResponse> => {
-    if (requestData.requestType === 'cakes') {
+    if (requestData.requestType === CakeryEndpoint.CAKES) {
         return axios.get<
             CakeData,
             CakeryApiCakesResponse,
@@ -64,7 +82,7 @@ const callCakeryApi = (
             CakeryApiOrdersResponse,
             CakeryApiPostRequestBody
         >(
-            config.cakeryUrl + 'orders',
+            config.cakeryUrl + requestData.requestType,
             {
                 ...config.cakeryApiGetRequestData,
                 cake: requestData.cake
@@ -74,6 +92,10 @@ const callCakeryApi = (
             }
         );
     }
+};
+
+const queueRequest = (requestData: ClientRequestData) => {
+    queue.push(requestData);
 };
 
 const processCakeryApiResponse = (
@@ -88,7 +110,7 @@ const processCakeryApiResponse = (
             };
             if (r.status === 200) {
                 messageForClient.status = 'success';
-                if (requestData.requestType === 'cakes') {
+                if (requestData.requestType === CakeryEndpoint.CAKES) {
                     const cakes = r.data.data as Cake[];
                     messageForClient.message = JSON.stringify(cakes);
                 } else {
@@ -128,13 +150,6 @@ const processCakeryApiResponse = (
         });
 };
 
-const takeRequestFromQueue = () => {
-    if (queue.length > 0) {
-        const requestData = queue.shift();
-        handleRequest(requestData!);
-    }
-};
-
 const removeProcessedRequest = (clientId: string) => {
     const index = processedRequests.findIndex((r) => r.clientId === clientId);
     if (index >= 0) {
@@ -142,22 +157,10 @@ const removeProcessedRequest = (clientId: string) => {
     }
 };
 
-const handleRequest = (requestData: ClientRequestData) => {
-    if (processedRequests.length < RATE_LIMIT) {
-        // make the request to Cakery API
-        const cakeryPromise = callCakeryApi(requestData);
-
-        // put the promise to the list of processed requests
-        // for controlling the request rate to Cakery API
-        processedRequests.push({
-            clientId: requestData.clientId,
-            promise: cakeryPromise
-        });
-
-        processCakeryApiResponse(cakeryPromise, requestData);
-    } else {
-        // queue the request
-        queueRequest(requestData);
+const takeRequestFromQueue = () => {
+    if (queue.length > 0) {
+        const requestData = queue.shift();
+        handleRequest(requestData!);
     }
 };
 

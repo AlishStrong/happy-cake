@@ -1,5 +1,10 @@
 import { AxiosHeaders, AxiosResponse } from 'axios';
 
+export const enum CakeryEndpoint {
+    CAKES = 'cakes',
+    ORDER = 'order'
+}
+
 export interface Cake {
     name: string;
     quantity: number;
@@ -35,6 +40,10 @@ export interface OrderData {
 }
 
 export type CakeryApiOrdersResponse = AxiosResponse<OrderData>;
+
+export type CakeryApiResponse =
+    | CakeryApiCakesResponse
+    | CakeryApiOrdersResponse;
 
 export enum CakeryApiErrors {
     TOO_MANY = 'Cakery API is overloaded with requests and returned 429',

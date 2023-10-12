@@ -15,7 +15,48 @@ const curDate = cur.getDate();
 
 const tomorrow = new Date([curYear - 25, curMonth, curDate + 1].join('-'));
 
-describe.only('router API tests', () => {
+describe('router API tests', () => {
+    describe('/cake-stock', () => {
+        const url = '/cake-stock';
+
+        test('should succeed', async () => {
+            jest.spyOn(uuid, 'v4').mockReturnValue('123456789');
+            jest.spyOn(axios, 'get').mockReturnValue(
+                new Promise((res, _rej) => {
+                    res({
+                        status: 200,
+                        data: {
+                            data: [
+                                { name: 'cake 1', quantity: 1 },
+                                { name: 'cake 2', quantity: 2 }
+                            ]
+                        }
+                    });
+                })
+            );
+
+            const response = await apiApp
+                .get(url)
+                .set('Accept', 'text/event-stream')
+                .expect(200);
+
+            expect(
+                response.text.includes(
+                    '{"status":"processing","message":"keep SSE open"}'
+                )
+            ).toBeTruthy();
+            expect(response.text.includes('"status":"success"')).toBeTruthy();
+            expect(response.text.includes('cake 1')).toBeTruthy();
+            expect(response.text.includes('cake 2')).toBeTruthy();
+        });
+
+        test('should send 400 and error message', async () => {
+            const response = await apiApp.get(url).expect(400);
+            const errorResponse = response.body as { errors: string[] };
+            expect(errorResponse.errors).toContain('Missing request headers');
+        });
+    });
+
     describe('/reserve', () => {
         describe('should succeed', () => {
             test('and return order ID', async () => {
@@ -59,6 +100,73 @@ describe.only('router API tests', () => {
                         '{"status":"success","message":"987654321"}'
                     )
                 ).toBeTruthy();
+            });
+
+            test('and prevent double processing', async () => {
+                const url = '/reserve';
+                const body = {
+                    cake: 'cake',
+                    name: 'John',
+                    birthday: tomorrow.toISOString(),
+                    address: 'some address',
+                    city: 'Helsinki'
+                };
+
+                jest.spyOn(uuid, 'v4').mockReturnValue('123456789');
+                jest.spyOn(axios, 'post').mockReturnValue(
+                    new Promise((res, _rej) => {
+                        setTimeout(() => {
+                            res({
+                                status: 200,
+                                data: { data: { order_id: '987654321' } }
+                            });
+                        }, 100);
+                    })
+                );
+
+                const response = await apiApp.post(url).send(body).expect(303);
+
+                expect(response.headers.location as string).toBe(
+                    '/reserve/123456789'
+                );
+
+                const firstResponsePromise = apiApp
+                    .get('/reserve/123456789')
+                    .set('Accept', 'text/event-stream')
+                    .expect(200)
+                    .expect((res) => {
+                        expect(
+                            res.text.includes(
+                                '{"status":"processing","message":"keep SSE open"}'
+                            )
+                        ).toBeTruthy();
+                        expect(
+                            res.text.includes(
+                                '{"status":"success","message":"987654321"}'
+                            )
+                        ).toBeTruthy();
+                    });
+
+                const secondResponsePromise = new Promise((res, _rej) => {
+                    setTimeout(() => res(''), 10);
+                }).then((_) => {
+                    return apiApp
+                        .get('/reserve/123456789')
+                        .set('Accept', 'text/event-stream')
+                        .expect(400)
+                        .expect((res) => {
+                            expect(
+                                res.text.includes(
+                                    '{"errors":["Request is already under processing"]}'
+                                )
+                            ).toBeTruthy();
+                        });
+                });
+
+                await Promise.all([
+                    firstResponsePromise,
+                    secondResponsePromise
+                ]);
             });
         });
 
