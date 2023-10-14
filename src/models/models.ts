@@ -21,7 +21,9 @@ export enum ReservationBodyError {
     ADDRESS = "Incorrect or missing recipient's address",
     CITY_NAME = 'Delivery can be made only to Helsinki, Espoo, or Vantaa',
     CITY = "Incorrect or missing recipient's city",
-    MESSAGE = 'Unsupported or unsafe message format'
+    MESSAGE = 'Unsupported or unsafe message format',
+    MESSAGE_IMAGE_TYPE = 'Unsupported file type',
+    MESSAGE_IMAGE_FILE = 'The image was corrupted and rejected'
 }
 
 interface ClientDataForGet {

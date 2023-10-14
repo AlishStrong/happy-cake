@@ -130,11 +130,13 @@ const processCakeryApiResponse = (
 
             requestData.responseObj.write(sse.toSseData(messageForClient));
         })
-        .catch((e) => {
-            console.error(e);
-            throw new Error(
-                JSON.stringify([`${CakeryApiErrors.DEAD}. Please check logs`])
-            );
+        .catch((e: Error) => {
+            console.error('processCakeryApiResponse caught error', e);
+            const messageForClient: MessageForClient = {
+                status: 'error',
+                message: `${CakeryApiErrors.DEAD}. Please check logs`
+            };
+            requestData.responseObj.write(sse.toSseData(messageForClient));
         })
         .finally(() => {
             // remove request from processedRequests

@@ -3,7 +3,8 @@ import {
     ClientData,
     ClientDataForPost,
     MessageForClient,
-    ReservationBody
+    ReservationBody,
+    ReservationBodyError
 } from '../models/models';
 import validators from '../utils/validators';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +12,7 @@ import sse from '../utils/sse';
 import requestLimiterService from '../services/request-limiter.service';
 import { ClientRequestData } from '../models/request-limiter.models';
 import { CakeryEndpoint } from '../models/cakery-api.models';
+import sharp from 'sharp';
 
 /**
  * Because the communication is asynchronous using SSE,
@@ -117,6 +119,28 @@ const checkCakeStock = (request: Request, response: Response): void => {
     requestLimiterService.handleRequest(requestData);
 };
 
+const IPAD_AIR_WIDTH = 1024;
+
+const processReservationBodyImage = async (
+    file: Express.Multer.File,
+    clientId: string
+): Promise<sharp.OutputInfo> => {
+    const fileExtension = file?.originalname.split('.').pop();
+    const info = await sharp(file?.buffer)
+        .resize({
+            width: IPAD_AIR_WIDTH,
+            fit: 'inside'
+        })
+        .toFile('./images/' + clientId + '.' + fileExtension)
+        .catch((_e) => {
+            throw new Error(
+                JSON.stringify([ReservationBodyError.MESSAGE_IMAGE_FILE])
+            );
+        });
+
+    return info;
+};
+
 /**
  * PART 1 of the Cake Reservation process
  * Notify application about an intent to reserve a cake.
@@ -129,7 +153,7 @@ const checkCakeStock = (request: Request, response: Response): void => {
  * Browser clients can open an SSE channel only via GET requests!
  * After that the process's PART 2 will continue by @see reserveCakeSse
  */
-const reserveCake = (request: Request, response: Response): void => {
+const reserveCake = async (request: Request, response: Response) => {
     // Step 1: check request body
     const reservationBody: ReservationBody = validators.toReservationBody(
         request.body
@@ -138,7 +162,13 @@ const reserveCake = (request: Request, response: Response): void => {
     // Step 2: generate request client ID
     const clientId = uuidv4();
 
-    // Step 3: add reservation body and client ID to an array of clients
+    // Step 3: check image in the request body
+    const imageFile = request.file;
+    if (imageFile) {
+        await processReservationBodyImage(imageFile, clientId);
+    }
+
+    // Step 4: add reservation body and client ID to an array of clients
     const clientData: ClientDataForPost = {
         clientId,
         reservationBody,
@@ -146,7 +176,7 @@ const reserveCake = (request: Request, response: Response): void => {
     };
     clients.push(clientData);
 
-    // Step 4: respond with redirect to GET /reserve with the generated client ID
+    // Step 5: respond with redirect to GET /reserve with the generated client ID
     response.redirect(303, '/reserve/' + clientId);
 };
 
@@ -165,27 +195,27 @@ const reserveCake = (request: Request, response: Response): void => {
  * Includes listeners for automatic SSE channel closure in case the client faces problems
  */
 const reserveCakeSse = (request: Request, response: Response): void => {
-    // Step 5: check that the request has headers "Accept: text/event-stream" needed for SSE
+    // Step 6: check that the request has headers "Accept: text/event-stream" needed for SSE
     checkAcceptHeaders(request);
 
-    // Step 6: check that the client ID is valid
+    // Step 7: check that the client ID is valid
     const clientId = request.params.id;
     const foundClient = getClient(clientId) as ClientDataForPost;
 
-    // Step 7: prepare SSE channel to the client
+    // Step 8: prepare SSE channel to the client
     response.writeHead(200, sse.headers);
 
-    // Step 8: notify client that the request is processing and it should keep channel open
+    // Step 9: notify client that the request is processing and it should keep channel open
     const messageForClient: MessageForClient = {
         status: 'processing',
         message: 'keep SSE open'
     };
     response.write(sse.toSseData(messageForClient));
 
-    // Step 9: Register listeners for filtering clients when SSE closes
+    // Step 10: Register listeners for filtering clients when SSE closes
     registerListeners(clientId, request, response);
 
-    // Step 10: order a cake from Cakery API
+    // Step 11: order a cake from Cakery API
     const requestData: ClientRequestData = {
         clientId,
         requestType: CakeryEndpoint.ORDER,

@@ -3,6 +3,8 @@ import app from '../../src/app';
 import { ReservationBodyError } from '../../src/models/models';
 import * as uuid from 'uuid';
 import axios from 'axios';
+import { CakeryApiErrors } from '../../src/models/cakery-api.models';
+import { existsSync, unlinkSync } from 'fs';
 jest.mock('uuid');
 jest.mock('axios');
 
@@ -55,6 +57,28 @@ describe('router API tests', () => {
             const errorResponse = response.body as { errors: string[] };
             expect(errorResponse.errors).toContain('Missing request headers');
         });
+
+        test("should send status 'error' and message if Cakery API is overloaded", async () => {
+            jest.spyOn(axios, 'get').mockReturnValue(
+                Promise.resolve({
+                    status: 429
+                })
+            );
+
+            const response = await apiApp
+                .get(url)
+                .set('Accept', 'text/event-stream')
+                .expect(200);
+
+            expect(
+                response.text.includes(
+                    '{"status":"processing","message":"keep SSE open"}'
+                )
+            ).toBeTruthy();
+            expect(
+                response.text.includes(CakeryApiErrors.TOO_MANY)
+            ).toBeTruthy();
+        });
     });
 
     describe('/reserve', () => {
@@ -79,7 +103,12 @@ describe('router API tests', () => {
                     })
                 );
 
-                const response = await apiApp.post(url).send(body).expect(303);
+                const response = await apiApp
+                    .post(url)
+                    .set('Content-Type', 'multipart/form-data')
+                    .field(body);
+
+                expect(response.status).toBe(303);
 
                 expect(response.headers.location as string).toBe(
                     '/reserve/123456789'
@@ -124,7 +153,7 @@ describe('router API tests', () => {
                     })
                 );
 
-                const response = await apiApp.post(url).send(body).expect(303);
+                const response = await apiApp.post(url).field(body).expect(303);
 
                 expect(response.headers.location as string).toBe(
                     '/reserve/123456789'
@@ -168,6 +197,58 @@ describe('router API tests', () => {
                     secondResponsePromise
                 ]);
             });
+
+            test('and save image', async () => {
+                const url = '/reserve';
+                const body = {
+                    cake: 'cake',
+                    name: 'John',
+                    birthday: tomorrow.toISOString(),
+                    address: 'some address',
+                    city: 'Helsinki'
+                };
+
+                jest.spyOn(uuid, 'v4').mockReturnValue('123456789');
+                jest.spyOn(axios, 'post').mockReturnValue(
+                    new Promise((res, _rej) => {
+                        res({
+                            status: 200,
+                            data: { data: { order_id: '987654321' } }
+                        });
+                    })
+                );
+
+                const response = await apiApp
+                    .post(url)
+                    .set('Content-Type', 'multipart/form-data')
+                    .field(body)
+                    .attach('image', './tests/test-images/image.png');
+
+                expect(response.status).toBe(303);
+                expect(existsSync('./images/123456789.png')).toBe(true);
+
+                expect(response.headers.location as string).toBe(
+                    '/reserve/123456789'
+                );
+
+                const finalResponse = await apiApp
+                    .get('/reserve/123456789')
+                    .set('Accept', 'text/event-stream')
+                    .expect(200);
+
+                expect(
+                    finalResponse.text.includes(
+                        '{"status":"processing","message":"keep SSE open"}'
+                    )
+                ).toBeTruthy();
+                expect(
+                    finalResponse.text.includes(
+                        '{"status":"success","message":"987654321"}'
+                    )
+                ).toBeTruthy();
+
+                unlinkSync('./images/123456789.png');
+            });
         });
 
         describe('should send 400 and error message', () => {
@@ -181,7 +262,7 @@ describe('router API tests', () => {
                     city: 'Tampere'
                 };
 
-                const response = await apiApp.post(url).send(body).expect(400);
+                const response = await apiApp.post(url).field(body).expect(400);
                 const errorResponse = response.body as { errors: string[] };
                 expect(errorResponse.errors).toContain(
                     ReservationBodyError.CITY_NAME
