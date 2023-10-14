@@ -1,0 +1,10 @@
+node_modules
+build
+Dockerfile
+
+.vscode
+.eslintignore
+.eslintrc.json
+.gitignore
+.prettierignore
+.prettierrc.json

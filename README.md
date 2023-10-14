@@ -91,3 +91,31 @@ curl \
 "message": "Happy birthday!"
 }' \
  http://localhost:3000/reserve
+
+===========================
+
+Create /images directory in the root of the project
+
+To create a development image tagged jobilla-dev:
+
+```
+docker build --target dev -t jobilla-dev .
+```
+
+To run this 'jobilla-dev' image with container name 'jobilla-dev':
+
+```
+docker run -p 3000:3000 -v /$PWD/src:/app/src -v /$PWD/images:/app/images --name jobilla-dev jobilla-dev
+```
+
+To create a production image tagged jobilla-prod:
+
+```
+docker build --target prod -t jobilla-prod .
+```
+
+To run this 'jobilla-prod' image with container name 'jobilla-prod':
+
+```
+docker run -p 3000:3000 -v /$PWD/images:/app/images --name jobilla-prod jobilla-prod
+```

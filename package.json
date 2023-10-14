@@ -4,10 +4,13 @@
     "description": "",
     "main": "index.js",
     "scripts": {
+        "build": "tsc",
         "start": "ts-node src/index.ts",
         "dev": "ts-node-dev src/index.ts",
+        "dev:docker": "ts-node-dev --poll src/index.ts",
         "test": "jest --verbose --runInBand",
         "test:watch": "jest --watch --verbose --runInBand",
+        "prod": "node build/src/index.js",
         "lint": "eslint --ext .ts . --fix"
     },
     "author": "",
