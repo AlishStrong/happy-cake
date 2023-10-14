@@ -8,6 +8,10 @@ const isString = (text: unknown): text is string => {
     return typeof text === 'string' || text instanceof String;
 };
 
+const sanitizeString = (input: string): string => {
+    return input.replace(/[;<>&'"\\]/g, '');
+};
+
 const isDate = (date: string): boolean => {
     return Boolean(Date.parse(date));
 };
@@ -37,7 +41,7 @@ const parseCake = (cake: unknown): string => {
         throw new Error(ReservationBodyError.CAKE);
     }
 
-    return decodeURI(cake.trim());
+    return sanitizeString(decodeURI(cake.trim()));
 };
 
 const parseName = (name: unknown): string => {
@@ -45,7 +49,7 @@ const parseName = (name: unknown): string => {
         throw new Error(ReservationBodyError.NAME);
     }
 
-    return name.trim();
+    return sanitizeString(name.trim());
 };
 
 const parseBirthday = (birthday: unknown): string => {
@@ -54,7 +58,9 @@ const parseBirthday = (birthday: unknown): string => {
     } else if (!isNextDay(birthday)) {
         throw new Error(ReservationBodyError.BIRTHDAY);
     }
-    return new Date(birthday.substring(0, 10)).toISOString().substring(0, 10);
+    return sanitizeString(
+        new Date(birthday.substring(0, 10)).toISOString().substring(0, 10)
+    );
 };
 
 const parseAddress = (address: unknown): string => {
@@ -62,7 +68,7 @@ const parseAddress = (address: unknown): string => {
         throw new Error(ReservationBodyError.ADDRESS);
     }
 
-    return address.trim();
+    return sanitizeString(address.trim());
 };
 
 const parseCity = (city: unknown): DeliveryCity => {
@@ -78,12 +84,9 @@ const parseCity = (city: unknown): DeliveryCity => {
     }
 };
 
-// TODO: complex check for safety
-// text, simple safe HTML, youtube embeds, and twitter embeds.
-// Make it safe to display in a user's browser, as we may also display it on the web.
 const parseMessage = (message: unknown): string => {
     if (isString(message)) {
-        return message;
+        return sanitizeString(message.trim());
     } else {
         throw new Error(ReservationBodyError.MESSAGE);
     }
@@ -139,6 +142,41 @@ const parseBodyFields = (
             }
         }
     }
+
+    if ('youtube' in body && body.youtube) {
+        // Copied from youtube-url npm package;
+        // Not used directly because TypeScript types were missing
+        const youtubeUrlRegex =
+            /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:m\.)?(?:youtu(?:be)?\.com\/(?:v\/|embed\/|watch(?:\/|\?v=))|youtu\.be\/)((?:\w|-){11})(?:\S+)?$/;
+
+        if (isString(body.youtube)) {
+            const sanitizedUrl = sanitizeString(body.youtube.trim());
+            if (sanitizedUrl.match(youtubeUrlRegex)) {
+                reservationBody.youtube = sanitizedUrl;
+            } else {
+                errorMessages.push(ReservationBodyError.YOUTUBE);
+            }
+        } else {
+            errorMessages.push(ReservationBodyError.YOUTUBE);
+        }
+    }
+
+    if ('twitter' in body && body.twitter) {
+        const XurlRegex =
+            /^https?:\/\/(?:www\.)?x\.com\/(?:#!\/)?(\w+)\/status\/(\d+)(?:\?.*)?$/;
+
+        if (isString(body.twitter)) {
+            const sanitizedUrl = sanitizeString(body.twitter.trim());
+
+            if (sanitizedUrl.match(XurlRegex)) {
+                reservationBody.twitter = sanitizedUrl;
+            } else {
+                errorMessages.push(ReservationBodyError.X_TWITTER);
+            }
+        } else {
+            errorMessages.push(ReservationBodyError.X_TWITTER);
+        }
+    }
 };
 
 const toReservationBody = (body: unknown): ReservationBody => {
@@ -159,6 +197,7 @@ const toReservationBody = (body: unknown): ReservationBody => {
 };
 
 export default {
+    sanitizeString,
     isString,
     isDate,
     isNextDay,
@@ -167,6 +206,7 @@ export default {
     parseBirthday,
     parseAddress,
     parseCity,
+    parseMessage,
     parseBodyFields,
     toReservationBody
 };

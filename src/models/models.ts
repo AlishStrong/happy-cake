@@ -8,8 +8,9 @@ export interface ReservationBody {
     birthday: string; // in yyyy-mm-dd format
     address: string;
     city: DeliveryCity;
-    message?: string; // text, simple safe HTML, youtube embeds, and twitter embeds.
-    // Make it safe to display in a user's browser, as we may also display it on the web.
+    message?: string;
+    youtube?: string;
+    twitter?: string;
 }
 
 export enum ReservationBodyError {
@@ -22,8 +23,10 @@ export enum ReservationBodyError {
     CITY_NAME = 'Delivery can be made only to Helsinki, Espoo, or Vantaa',
     CITY = "Incorrect or missing recipient's city",
     MESSAGE = 'Unsupported or unsafe message format',
-    MESSAGE_IMAGE_TYPE = 'Unsupported file type',
-    MESSAGE_IMAGE_FILE = 'The image was corrupted and rejected'
+    IMAGE_TYPE = 'Unsupported file type',
+    IMAGE_FILE = 'The image was corrupted and rejected',
+    YOUTUBE = 'Invalid YouTube video URL',
+    X_TWITTER = 'Invalid X (Twitter) URL'
 }
 
 interface ClientDataForGet {

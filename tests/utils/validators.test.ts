@@ -35,6 +35,30 @@ describe('velidators', () => {
         });
     });
 
+    describe('sanitizeString', () => {
+        test.each([
+            { input: 'str', exp: 'str' },
+            { input: 'st&r', exp: 'str' },
+            { input: "st'r", exp: 'str' },
+            { input: 'st;r', exp: 'str' },
+            { input: 'st<r>', exp: 'str' },
+            { input: 'st"r', exp: 'str' },
+            { input: 'st\\r', exp: 'str' }
+        ])(
+            'should return string without ; < > & \' " \\ characters',
+            ({ input, exp }) => {
+                const result = validators.sanitizeString(input);
+                expect(result).toBe(exp);
+            }
+        );
+
+        it('should return true if input is an instance of String', () => {
+            const input = new String('Hello, World!');
+            const result = validators.isString(input);
+            expect(result).toBe(true);
+        });
+    });
+
     describe('isDate', () => {
         test.each([
             { input: '2022-01-01', expected: true },
@@ -78,6 +102,10 @@ describe('velidators', () => {
             { cake: 'チーズケーキ', expected: 'チーズケーキ' },
             { cake: encodeURI('チーズケーキ'), expected: 'チーズケーキ' },
             { cake: ' Trimmed ', expected: 'Trimmed' },
+            {
+                cake: ' &Tab;javascript:alert(321)',
+                expected: 'Tabjavascript:alert(321)'
+            },
             { cake: '', expected: 'error' },
             { cake: '   ', expected: 'error' },
             { cake: null, expected: 'error' },
@@ -105,6 +133,10 @@ describe('velidators', () => {
         test.each([
             { name: 'Jake', expected: 'Jake' },
             { name: ' Trimmed ', expected: 'Trimmed' },
+            {
+                name: ' &Tab;javascript:alert(321)',
+                expected: 'Tabjavascript:alert(321)'
+            },
             { name: '', expected: 'error' },
             { name: '   ', expected: 'error' },
             { name: null, expected: 'error' },
@@ -198,6 +230,10 @@ describe('velidators', () => {
                 expected: 'Some street, some apartment'
             },
             { address: ' trimmed address ', expected: 'trimmed address' },
+            {
+                address: ' &Tab;javascript:alert(321)',
+                expected: 'Tabjavascript:alert(321)'
+            },
             { address: '', expected: 'error' },
             { address: null, expected: 'error' },
             { address: undefined, expected: 'error' },
@@ -289,8 +325,48 @@ describe('velidators', () => {
         });
     });
 
-    // TODO
-    describe('parseMessage', () => {});
+    describe('parseMessage', () => {
+        test.each([
+            { message: '<script>', expected: 'script' },
+            { message: ' hel&inki ', expected: 'helinki' }
+        ])(
+            'should return $expected when message is $message',
+            ({ message, expected }) => {
+                expect(validators.parseMessage(message)).toEqual(expected);
+            }
+        );
+
+        describe('should throw error', () => {
+            test.each([
+                {
+                    message: null,
+                    error: ReservationBodyError.MESSAGE
+                },
+                {
+                    message: undefined,
+                    error: ReservationBodyError.MESSAGE
+                },
+                {
+                    message: true,
+                    error: ReservationBodyError.MESSAGE
+                },
+                {
+                    message: false,
+                    error: ReservationBodyError.MESSAGE
+                },
+                {
+                    message: {},
+                    error: ReservationBodyError.MESSAGE
+                },
+                {
+                    message: today,
+                    error: ReservationBodyError.MESSAGE
+                }
+            ])("$error when message is '$message'", ({ message, error }) => {
+                expect(() => validators.parseMessage(message)).toThrow(error);
+            });
+        });
+    });
 
     describe('parseBodyFields', () => {
         test('should create ReservationBody without message', () => {
@@ -317,14 +393,18 @@ describe('velidators', () => {
             expect(reservationBody.city).toBe('helsinki');
         });
 
-        test('should create ReservationBody with message', () => {
+        test('should create ReservationBody with message, YouTube video and X (Twitter) message', () => {
             const body = {
                 cake: 'cake',
                 name: 'John',
                 birthday: tomorrow.toISOString(),
                 address: 'some address',
                 city: 'Helsinki',
-                message: 'Happy birthday!'
+                message: 'Happy birthday!',
+                youtube:
+                    'https://www.youtube.com/embed/X7mdC67zff4?si=JSMKrRItffvWN2Yd',
+                twitter:
+                    'https://x.com/realDonaldTrump/status/1347569870578266115?s=20'
             };
             const reservationBody = {} as ReservationBody;
             const errorMessages: string[] = [];
@@ -341,6 +421,12 @@ describe('velidators', () => {
             expect(reservationBody.address).toBe('some address');
             expect(reservationBody.city).toBe('helsinki');
             expect(reservationBody.message).toBe('Happy birthday!');
+            expect(reservationBody.youtube).toBe(
+                'https://www.youtube.com/embed/X7mdC67zff4?si=JSMKrRItffvWN2Yd'
+            );
+            expect(reservationBody.twitter).toBe(
+                'https://x.com/realDonaldTrump/status/1347569870578266115?s=20'
+            );
         });
 
         describe('should indicate missing fields', () => {
@@ -396,6 +482,34 @@ describe('velidators', () => {
                     errorMessages.includes('city field is missing')
                 ).toBeTruthy();
             });
+        });
+
+        test('should indicate YouTube video and X (Twitter) message are invalid', () => {
+            const body = {
+                cake: 'cake',
+                name: 'John',
+                birthday: tomorrow.toISOString(),
+                address: 'some address',
+                city: 'Helsinki',
+                message: 'Happy birthday!',
+                youtube:
+                    'https://www.rutube.com/X7mdC67zff4?si=JSMKrRItffvWN2Yd',
+                twitter:
+                    'https://threads.com/fakeDonaldTrump/status/1347569870578266115?s=20'
+            };
+            const reservationBody = {} as ReservationBody;
+            const errorMessages: string[] = [];
+
+            validators.parseBodyFields(body, reservationBody, errorMessages);
+
+            expect(errorMessages.length).toBeGreaterThan(0);
+
+            expect(
+                errorMessages.includes(ReservationBodyError.YOUTUBE)
+            ).toBeTruthy();
+            expect(
+                errorMessages.includes(ReservationBodyError.X_TWITTER)
+            ).toBeTruthy();
         });
     });
 

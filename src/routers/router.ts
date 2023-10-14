@@ -18,7 +18,7 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         const error: Error = new Error(
-            JSON.stringify([ReservationBodyError.MESSAGE_IMAGE_TYPE])
+            JSON.stringify([ReservationBodyError.IMAGE_TYPE])
         );
         const mimetypes = Object.values<string>(ImageMimeTypes);
         const extensions = mimetypes.map((t) => t.split('/').pop());

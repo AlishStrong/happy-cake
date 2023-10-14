@@ -72,6 +72,26 @@ const getClient = (clientId: string) => {
     }
 };
 
+const IPAD_AIR_WIDTH = 1024;
+
+const processReservationBodyImage = async (
+    file: Express.Multer.File,
+    clientId: string
+): Promise<sharp.OutputInfo> => {
+    const fileExtension = file?.originalname.split('.').pop();
+    const info = await sharp(file?.buffer)
+        .resize({
+            width: IPAD_AIR_WIDTH,
+            fit: 'inside'
+        })
+        .toFile('./images/' + clientId + '.' + fileExtension)
+        .catch((_e) => {
+            throw new Error(JSON.stringify([ReservationBodyError.IMAGE_FILE]));
+        });
+
+    return info;
+};
+
 /**
  * Handle requests for checking the stock of cakes.
  *
@@ -117,28 +137,6 @@ const checkCakeStock = (request: Request, response: Response): void => {
         responseObj: response
     };
     requestLimiterService.handleRequest(requestData);
-};
-
-const IPAD_AIR_WIDTH = 1024;
-
-const processReservationBodyImage = async (
-    file: Express.Multer.File,
-    clientId: string
-): Promise<sharp.OutputInfo> => {
-    const fileExtension = file?.originalname.split('.').pop();
-    const info = await sharp(file?.buffer)
-        .resize({
-            width: IPAD_AIR_WIDTH,
-            fit: 'inside'
-        })
-        .toFile('./images/' + clientId + '.' + fileExtension)
-        .catch((_e) => {
-            throw new Error(
-                JSON.stringify([ReservationBodyError.MESSAGE_IMAGE_FILE])
-            );
-        });
-
-    return info;
 };
 
 /**
