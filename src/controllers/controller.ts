@@ -242,9 +242,18 @@ const getTodaysDeliveries = async (request: Request, response: Response) => {
     response.json(r);
 };
 
+const getTodaysBirthdayPeople = async (
+    _request: Request,
+    response: Response
+) => {
+    const r = await databaseService.getTodaysBirthdayPeople();
+    response.json(r);
+};
+
 export default {
     checkCakeStock,
     reserveCakeSse,
     reserveCake,
-    getTodaysDeliveries
+    getTodaysDeliveries,
+    getTodaysBirthdayPeople
 };

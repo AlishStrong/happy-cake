@@ -70,3 +70,5 @@ export interface TodayDelivery
     > {
     ordernumber: string;
 }
+
+export type TodayBirthdayPeople = Pick<ReservationBody, 'name' | 'address'>[];

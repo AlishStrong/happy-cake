@@ -1,5 +1,9 @@
 import database from '../database/database';
-import { ReservationBody, TodayDelivery } from '../models/models';
+import {
+    ReservationBody,
+    TodayBirthdayPeople,
+    TodayDelivery
+} from '../models/models';
 
 const saveReservation = async (
     resrvationBody: ReservationBody,
@@ -43,7 +47,7 @@ const getTodaysDeliveries = async (city: string) => {
         'SELECT `name`, `address`, `image`, `message`, `youtube`, `twitter`, `cake`, `ordernumber` FROM `reservations` WHERE `status` = "processing" AND `city` = ? AND `bmonth` = ? AND `bdate` = ?';
     let params = [city, curMonth, curDate];
 
-    // if todays is the 1st of March, then include born on the 29th of February
+    // if today is the 1st of March, then include born on the 29th of February
     if (curDate === 1 && curMonth === 3) {
         selectQuery =
             'SELECT `name`, `address`, `image`, `message`, `youtube`, `twitter`, `cake`, `ordernumber` FROM `reservations` WHERE `status` = "processing" AND `city` = ? AND ((`bmonth` = 3 AND `bdate` = 1) OR (`bmonth` = 2 AND `bdate` = 29))';
@@ -58,7 +62,33 @@ const getTodaysDeliveries = async (city: string) => {
     return result;
 };
 
+// name and address of same month-date and delivered-already
+const getTodaysBirthdayPeople = async () => {
+    const current = new Date();
+    const curMonth = current.getMonth() + 1; // January is 0
+    const curDate = current.getDate();
+
+    let selectQuery =
+        'SELECT `name`, `address` FROM `reservations` WHERE `status` = "delivered" AND `bmonth` = ? AND `bdate` = ?';
+    let params = [curMonth, curDate];
+
+    // if today is the 1st of March, then include born on the 29th of February
+    if (curDate === 1 && curMonth === 3) {
+        selectQuery =
+            'SELECT `name`, `address` FROM `reservations` WHERE `status` = "delivered" AND ((`bmonth` = 3 AND `bdate` = 1) OR (`bmonth` = 2 AND `bdate` = 29))';
+        params = [];
+    }
+
+    const result = await database.executeQuery<TodayBirthdayPeople>(
+        selectQuery,
+        params
+    );
+
+    return result;
+};
+
 export default {
     saveReservation,
-    getTodaysDeliveries
+    getTodaysDeliveries,
+    getTodaysBirthdayPeople
 };
