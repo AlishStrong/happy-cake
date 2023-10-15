@@ -2,7 +2,7 @@ import { AxiosHeaders, AxiosResponse } from 'axios';
 
 export const enum CakeryEndpoint {
     CAKES = 'cakes',
-    ORDER = 'order'
+    ORDERS = 'orders'
 }
 
 export interface Cake {

@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { CakeryApiResponse, CakeryEndpoint } from './cakery-api.models';
+import { ReservationBody } from './models';
 
 export interface ProcessedRequest {
     clientId: string;
@@ -16,8 +17,8 @@ interface ClientGetRequestData extends ClientRequestDataBase {
 }
 
 interface ClientPostRequestData extends ClientRequestDataBase {
-    requestType: CakeryEndpoint.ORDER;
-    cake: string;
+    requestType: CakeryEndpoint.ORDERS;
+    reservationBody: ReservationBody;
 }
 
 export type ClientRequestData = ClientGetRequestData | ClientPostRequestData;

@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+    database:
+        container_name: db
+        image: mysql:8.0.34-debian
+        restart: unless-stopped
+        user: mysql:mysql
+        ports:
+            - '3306:3306'
+        environment:
+            - MYSQL_ROOT_PASSWORD
+            - MYSQL_DATABASE=happycake
+            - MYSQL_USER=caker
+            - MYSQL_PASSWORD
+            - TZ=Europe/Helsinki
+        volumes:
+            - ./mysql:/docker-entrypoint-initdb.d/:ro
+        command:
+            [
+                'mysqld',
+                '--sql-mode=STRICT_ALL_TABLES',
+                '--character-set-server=utf8mb4',
+                '--collation-server=utf8mb4_swedish_ci'
+            ]

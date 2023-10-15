@@ -8,6 +8,7 @@ export interface ReservationBody {
     birthday: string; // in yyyy-mm-dd format
     address: string;
     city: DeliveryCity;
+    image?: string;
     message?: string;
     youtube?: string;
     twitter?: string;
@@ -48,4 +49,9 @@ export interface SseHeaders extends OutgoingHttpHeaders {
 export interface MessageForClient {
     status: 'processing' | 'success' | 'error';
     message: string;
+}
+
+export enum DatabaseErrors {
+    UNAVAILABLE = 'Unable to connect to the database',
+    QUERY = 'Failed to perform query execution'
 }

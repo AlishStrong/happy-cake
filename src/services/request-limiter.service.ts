@@ -34,12 +34,14 @@ import {
     OrderData
 } from '../models/cakery-api.models';
 import config from '../utils/cakery-api.config';
-import { MessageForClient } from '../models/models';
+import { DatabaseErrors, MessageForClient } from '../models/models';
 import sse from '../utils/sse';
 import {
     ClientRequestData,
     ProcessedRequest
 } from '../models/request-limiter.models';
+import databaseService from './database.service';
+import { unlinkSync } from 'fs';
 
 const RATE_LIMIT = 60;
 const processedRequests: ProcessedRequest[] = [];
@@ -85,7 +87,7 @@ const callCakeryApi = (
             config.cakeryUrl + requestData.requestType,
             {
                 ...config.cakeryApiGetRequestData,
-                cake: requestData.cake
+                cake: requestData.reservationBody.cake
             },
             {
                 headers: config.cakeryApiHeaders
@@ -128,7 +130,22 @@ const processCakeryApiResponse = (
                 messageForClient.message = `${CakeryApiErrors.DEAD}. It returned ${r.status}`;
             }
 
-            requestData.responseObj.write(sse.toSseData(messageForClient));
+            return messageForClient;
+        })
+        .then((m) => {
+            if (
+                m.status === 'error' ||
+                requestData.requestType === CakeryEndpoint.CAKES
+            ) {
+                requestData.responseObj.write(sse.toSseData(m));
+                return Promise.resolve();
+            } else {
+                return databaseService
+                    .saveReservation(requestData.reservationBody, m.message)
+                    .then((_) => {
+                        requestData.responseObj.write(sse.toSseData(m));
+                    });
+            }
         })
         .catch((e: Error) => {
             console.error('processCakeryApiResponse caught error', e);
@@ -136,6 +153,18 @@ const processCakeryApiResponse = (
                 status: 'error',
                 message: `${CakeryApiErrors.DEAD}. Please check logs`
             };
+            if (Object.values<string>(DatabaseErrors).includes(e.message)) {
+                messageForClient.message = e.message;
+            }
+
+            // remove image if there is
+            if (
+                'reservationBody' in requestData &&
+                requestData.reservationBody.image
+            ) {
+                unlinkSync('./images/' + requestData.reservationBody.image);
+            }
+
             requestData.responseObj.write(sse.toSseData(messageForClient));
         })
         .finally(() => {

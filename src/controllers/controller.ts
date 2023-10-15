@@ -77,19 +77,20 @@ const IPAD_AIR_WIDTH = 1024;
 const processReservationBodyImage = async (
     file: Express.Multer.File,
     clientId: string
-): Promise<sharp.OutputInfo> => {
+): Promise<string> => {
     const fileExtension = file?.originalname.split('.').pop();
-    const info = await sharp(file?.buffer)
+    const imageName = clientId + '.' + fileExtension;
+    await sharp(file?.buffer)
         .resize({
             width: IPAD_AIR_WIDTH,
             fit: 'inside'
         })
-        .toFile('./images/' + clientId + '.' + fileExtension)
+        .toFile('./images/' + imageName)
         .catch((_e) => {
             throw new Error(JSON.stringify([ReservationBodyError.IMAGE_FILE]));
         });
 
-    return info;
+    return imageName;
 };
 
 /**
@@ -163,7 +164,11 @@ const reserveCake = async (request: Request, response: Response) => {
     // Step 3: check image in the request body
     const imageFile = request.file;
     if (imageFile) {
-        await processReservationBodyImage(imageFile, clientId);
+        const imageName = await processReservationBodyImage(
+            imageFile,
+            clientId
+        );
+        reservationBody.image = imageName;
     }
 
     // Step 4: add reservation body and client ID to an array of clients
@@ -216,9 +221,9 @@ const reserveCakeSse = (request: Request, response: Response): void => {
     // Step 11: order a cake from Cakery API
     const requestData: ClientRequestData = {
         clientId,
-        requestType: CakeryEndpoint.ORDER,
+        requestType: CakeryEndpoint.ORDERS,
         responseObj: response,
-        cake: foundClient.reservationBody.cake
+        reservationBody: foundClient.reservationBody
     };
     requestLimiterService.handleRequest(requestData);
 };

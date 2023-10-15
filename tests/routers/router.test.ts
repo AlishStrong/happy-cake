@@ -5,6 +5,8 @@ import * as uuid from 'uuid';
 import axios from 'axios';
 import { CakeryApiErrors } from '../../src/models/cakery-api.models';
 import { existsSync, unlinkSync } from 'fs';
+import databaseService from '../../src/services/database.service';
+jest.mock('../../src/services/database.service');
 jest.mock('uuid');
 jest.mock('axios');
 
@@ -101,6 +103,10 @@ describe('router API tests', () => {
                             data: { data: { order_id: '987654321' } }
                         });
                     })
+                );
+
+                jest.spyOn(databaseService, 'saveReservation').mockReturnValue(
+                    Promise.resolve()
                 );
 
                 const response = await apiApp
