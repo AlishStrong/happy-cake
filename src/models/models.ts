@@ -22,6 +22,7 @@ export enum ReservationBodyError {
     BIRTHDAY = 'Cake can be reserved 1 day before the birthday!',
     ADDRESS = "Incorrect or missing recipient's address",
     CITY_NAME = 'Delivery can be made only to Helsinki, Espoo, or Vantaa',
+    CITY_QUERY = 'Missing city query of Helsinki, Espoo, or Vantaa',
     CITY = "Incorrect or missing recipient's city",
     MESSAGE = 'Unsupported or unsafe message format',
     IMAGE_TYPE = 'Unsupported file type',
@@ -54,4 +55,18 @@ export interface MessageForClient {
 export enum DatabaseErrors {
     UNAVAILABLE = 'Unable to connect to the database',
     QUERY = 'Failed to perform query execution'
+}
+
+export interface TodayDelivery
+    extends Pick<
+        ReservationBody,
+        | 'name'
+        | 'address'
+        | 'image'
+        | 'message'
+        | 'youtube'
+        | 'twitter'
+        | 'cake'
+    > {
+    ordernumber: string;
 }

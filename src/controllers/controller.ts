@@ -13,6 +13,7 @@ import requestLimiterService from '../services/request-limiter.service';
 import { ClientRequestData } from '../models/request-limiter.models';
 import { CakeryEndpoint } from '../models/cakery-api.models';
 import sharp from 'sharp';
+import databaseService from '../services/database.service';
 
 /**
  * Because the communication is asynchronous using SSE,
@@ -228,8 +229,22 @@ const reserveCakeSse = (request: Request, response: Response): void => {
     requestLimiterService.handleRequest(requestData);
 };
 
+const getTodaysDeliveries = async (request: Request, response: Response) => {
+    const city = request.query.city as string;
+    if (
+        !city ||
+        !['helsinki', 'espoo', 'vantaa'].includes(city.toLowerCase())
+    ) {
+        throw new Error(ReservationBodyError.CITY_QUERY);
+    }
+
+    const r = await databaseService.getTodaysDeliveries(city.toLowerCase());
+    response.json(r);
+};
+
 export default {
     checkCakeStock,
     reserveCakeSse,
-    reserveCake
+    reserveCake,
+    getTodaysDeliveries
 };

@@ -39,5 +39,6 @@ const router = express.Router();
 router.get('/cake-stock', controller.checkCakeStock);
 router.post('/reserve', upload.single('image'), controller.reserveCake); // PART 1 of the Cake Reservation process
 router.get('/reserve/:id', controller.reserveCakeSse); // PART 2 of the Cake Reservation process
+router.get('/deliveries-today', controller.getTodaysDeliveries);
 
 export default router;
