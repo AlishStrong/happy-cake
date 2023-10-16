@@ -115,7 +115,7 @@ const processCakeryApiResponse = (
                 messageForClient.status = 'success';
                 if (requestData.requestType === CakeryEndpoint.CAKES) {
                     const cakes = r.data.data as Cake[];
-                    messageForClient.message = JSON.stringify(cakes);
+                    messageForClient.message = cakes;
                 } else {
                     const data = r.data.data as CakeOrder;
                     messageForClient.message = data.order_id;
@@ -142,7 +142,10 @@ const processCakeryApiResponse = (
                 return Promise.resolve();
             } else {
                 return databaseService
-                    .saveReservation(requestData.reservationBody, m.message)
+                    .saveReservation(
+                        requestData.reservationBody,
+                        m.message as string
+                    )
                     .then((_) => {
                         requestData.responseObj.write(sse.toSseData(m));
                     });

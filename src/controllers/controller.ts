@@ -43,7 +43,6 @@ const registerListeners = (
  * @param Request must include 'Accept: text/event-stream' headers.
  *
  * Responses to client with real-time messages @see MessageForClient via SSE.
- * Messages are stringified JSONs and need to be parsed by the client.
  * When status of message is 'processing', client must keep the SSE channel open.
  * When status of message is 'success' or 'error', client needs to process the message-field and close the channel.
  *

@@ -1,4 +1,5 @@
 import { OutgoingHttpHeaders } from 'http';
+import { Cake } from './cakery-api.models';
 
 export type DeliveryCity = 'helsinki' | 'espoo' | 'vantaa';
 
@@ -49,7 +50,7 @@ export interface SseHeaders extends OutgoingHttpHeaders {
 
 export interface MessageForClient {
     status: 'processing' | 'success' | 'error';
-    message: string;
+    message: string | Cake[];
 }
 
 export enum ImageMimeTypes {
