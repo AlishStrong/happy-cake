@@ -15,8 +15,6 @@ COPY --chown=noder:noder . .
 
 VOLUME [ "/app/src", "/app/images" ]
 EXPOSE 3000
-CMD ["npm", "run", "dev:docker"]
 
 FROM dev as prod
 RUN ["npm", "run", "build"]
-CMD ["npm", "run", "prod"]

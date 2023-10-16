@@ -7,11 +7,11 @@ services:
         restart: unless-stopped
         user: mysql:mysql
         ports:
-            - '3306:3306'
+            - '${MYSQL_PORT}:${MYSQL_PORT}'
         environment:
             - MYSQL_ROOT_PASSWORD
             - MYSQL_DATABASE=happycake
-            - MYSQL_USER=caker
+            - MYSQL_USER
             - MYSQL_PASSWORD
             - TZ=Europe/Helsinki
         volumes:
@@ -23,3 +23,32 @@ services:
                 '--character-set-server=utf8mb4',
                 '--collation-server=utf8mb4_swedish_ci'
             ]
+        healthcheck:
+            test: mysqladmin ping -h localhost -u ${MYSQL_USER} --password=${MYSQL_PASSWORD} --silent
+            interval: 10s
+            timeout: 5s
+            retries: 5
+    application:
+        container_name: app
+        depends_on:
+            database:
+                condition: service_healthy
+        build:
+            context: ./
+            dockerfile: Dockerfile
+            target: dev
+        volumes:
+            - ./src:/app/src
+            - ./images:/app/images
+        ports:
+            - '${PORT}:${PORT}'
+        environment:
+            - PORT
+            - MYSQL_HOST=database
+            - MYSQL_USER
+            - MYSQL_PORT
+            - MYSQL_PASSWORD
+            - MYSQL_SCHEMA=happycake
+            - SIZE_LIMIT
+            - RATE_LIMIT
+        command: ['npm', 'run', 'dev:docker']

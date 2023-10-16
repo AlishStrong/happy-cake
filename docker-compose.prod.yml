@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+    application:
+        build:
+            target: prod
+        command: ['npm', 'run', 'prod']
