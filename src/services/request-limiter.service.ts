@@ -34,16 +34,17 @@ import {
     OrderData
 } from '../models/cakery-api.models';
 import config from '../utils/cakery-api.config';
-import { DatabaseErrors, MessageForClient } from '../models/models';
+import { MessageForClient } from '../models/models';
 import sse from '../utils/sse';
 import {
     ClientRequestData,
     ProcessedRequest
 } from '../models/request-limiter.models';
 import databaseService from './database.service';
-import { unlinkSync } from 'fs';
+import { DatabaseErrors } from '../models/database.models';
+import imageFileService from './image-file.service';
 
-const RATE_LIMIT = 60;
+const RATE_LIMIT = process.env.RATE_LIMIT ? +process.env.RATE_LIMIT : 60;
 const processedRequests: ProcessedRequest[] = [];
 const queue: ClientRequestData[] = [];
 
@@ -162,7 +163,9 @@ const processCakeryApiResponse = (
                 'reservationBody' in requestData &&
                 requestData.reservationBody.image
             ) {
-                unlinkSync('./images/' + requestData.reservationBody.image);
+                imageFileService.deleteReservationBodyImage(
+                    requestData.reservationBody.image
+                );
             }
 
             requestData.responseObj.write(sse.toSseData(messageForClient));

@@ -1,3 +1,4 @@
+import { Request } from 'express';
 import {
     DeliveryCity,
     ReservationBody,
@@ -196,6 +197,13 @@ const toReservationBody = (body: unknown): ReservationBody => {
     return reservationBody;
 };
 
+const checkAcceptHeaders = (request: Request) => {
+    const acceptHeader = request.header('Accept');
+    if (!acceptHeader || acceptHeader !== 'text/event-stream') {
+        throw new Error(JSON.stringify(['Missing request headers']));
+    }
+};
+
 export default {
     sanitizeString,
     isString,
@@ -208,5 +216,6 @@ export default {
     parseCity,
     parseMessage,
     parseBodyFields,
-    toReservationBody
+    toReservationBody,
+    checkAcceptHeaders
 };

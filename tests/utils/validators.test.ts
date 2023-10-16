@@ -1,3 +1,4 @@
+import { Request } from 'express';
 import { ReservationBody, ReservationBodyError } from '../../src/models/models';
 import validators from '../../src/utils/validators';
 
@@ -595,6 +596,26 @@ describe('velidators', () => {
                     ])
                 );
             });
+        });
+    });
+
+    describe('checkAcceptHeaders', () => {
+        test('not throw error when accept: text/event-stream header', () => {
+            const request = {
+                header: jest.fn().mockReturnValue('text/event-stream')
+            } as unknown as Request;
+
+            expect(() =>
+                validators.checkAcceptHeaders(request)
+            ).not.toThrowError();
+        });
+
+        test('throw error', () => {
+            const request = {
+                header: jest.fn().mockReturnValue('application/json')
+            } as unknown as Request;
+
+            expect(() => validators.checkAcceptHeaders(request)).toThrowError();
         });
     });
 });

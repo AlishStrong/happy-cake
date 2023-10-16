@@ -52,23 +52,9 @@ export interface MessageForClient {
     message: string;
 }
 
-export enum DatabaseErrors {
-    UNAVAILABLE = 'Unable to connect to the database',
-    QUERY = 'Failed to perform query execution'
+export enum ImageMimeTypes {
+    PNG = 'image/png',
+    JPG = 'image/jpg',
+    JPEG = 'image/jpeg',
+    GIF = 'image/gif'
 }
-
-export interface TodayDelivery
-    extends Pick<
-        ReservationBody,
-        | 'name'
-        | 'address'
-        | 'image'
-        | 'message'
-        | 'youtube'
-        | 'twitter'
-        | 'cake'
-    > {
-    ordernumber: string;
-}
-
-export type TodayBirthdayPeople = Pick<ReservationBody, 'name' | 'address'>[];

@@ -17,7 +17,9 @@ const cakeryApiGetRequestData: CakeryApiRequestBody = {
     key: REQUEST_BODY_KEY
 };
 
-const cakeryUrl = 'https://api.cakery.dev/';
+export const cakeryUrl = 'https://api.cakery.dev/';
+export const cakeryCakes = 'cakes';
+export const cakeryOrders = 'orders';
 
 export default {
     cakeryApiHeaders,

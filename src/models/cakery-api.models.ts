@@ -1,8 +1,9 @@
 import { AxiosHeaders, AxiosResponse } from 'axios';
+import { cakeryCakes, cakeryOrders } from '../utils/cakery-api.config';
 
 export const enum CakeryEndpoint {
-    CAKES = 'cakes',
-    ORDERS = 'orders'
+    CAKES = cakeryCakes,
+    ORDERS = cakeryOrders
 }
 
 export interface Cake {

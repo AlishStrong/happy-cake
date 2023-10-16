@@ -12,86 +12,29 @@ import sse from '../utils/sse';
 import requestLimiterService from '../services/request-limiter.service';
 import { ClientRequestData } from '../models/request-limiter.models';
 import { CakeryEndpoint } from '../models/cakery-api.models';
-import sharp from 'sharp';
 import databaseService from '../services/database.service';
+import clientsService from '../services/clients.service';
+import imageFileService from '../services/image-file.service';
 
 /**
- * Because the communication is asynchronous using SSE,
- * the application needs to keep track of clients.
- * Once Cakery API responses, the application will find the right client
- * and forward a message using SSE
+ * Registers listeners on @see Request and @see Response to remove clients
+ * once SSE connection with the client is finished
+ *
+ * @param clientId uuid of a client that made the request
+ * @param request {@link Request} object to register 'close' listener
+ * @param response {@link Response} object to register 'finish' listener
  */
-const clients: ClientData[] = [];
-
-const removeClient = (clientId: string) => {
-    const index = clients.findIndex((c) => c.clientId === clientId);
-    if (index !== -1) {
-        clients.splice(index, 1);
-    }
-};
-
-const checkAcceptHeaders = (request: Request) => {
-    const acceptHeader = request.header('Accept');
-    if (!acceptHeader || acceptHeader !== 'text/event-stream') {
-        throw new Error(JSON.stringify(['Missing request headers']));
-    }
-};
-
 const registerListeners = (
     clientId: string,
     request: Request,
     response: Response
 ) => {
     request.on('close', () => {
-        removeClient(clientId);
+        clientsService.removeClient(clientId);
     });
     response.on('finish', () => {
-        removeClient(clientId);
+        clientsService.removeClient(clientId);
     });
-};
-
-const getClient = (clientId: string) => {
-    const foundClient = clients.find((c) => c.clientId === clientId);
-    if (!foundClient) {
-        throw new Error(JSON.stringify(['Unknown client request']));
-    } else if ('status' in foundClient) {
-        if (foundClient.status === 'processed') {
-            throw new Error(
-                JSON.stringify(['Request is already under processing'])
-            );
-        } else {
-            foundClient.status = 'processed';
-            clients.splice(
-                clients.findIndex((c) => c.clientId === clientId),
-                1,
-                foundClient
-            );
-            return foundClient;
-        }
-    } else {
-        return foundClient;
-    }
-};
-
-const IPAD_AIR_WIDTH = 1024;
-
-const processReservationBodyImage = async (
-    file: Express.Multer.File,
-    clientId: string
-): Promise<string> => {
-    const fileExtension = file?.originalname.split('.').pop();
-    const imageName = clientId + '.' + fileExtension;
-    await sharp(file?.buffer)
-        .resize({
-            width: IPAD_AIR_WIDTH,
-            fit: 'inside'
-        })
-        .toFile('./images/' + imageName)
-        .catch((_e) => {
-            throw new Error(JSON.stringify([ReservationBodyError.IMAGE_FILE]));
-        });
-
-    return imageName;
 };
 
 /**
@@ -108,7 +51,7 @@ const processReservationBodyImage = async (
  */
 const checkCakeStock = (request: Request, response: Response): void => {
     // Step 1: check that the request has headers "Accept: text/event-stream" needed for SSE
-    checkAcceptHeaders(request);
+    validators.checkAcceptHeaders(request);
 
     // Step 2: generate request client ID
     const clientId = uuidv4();
@@ -117,7 +60,7 @@ const checkCakeStock = (request: Request, response: Response): void => {
     const clientData: ClientData = {
         clientId
     };
-    clients.push(clientData);
+    clientsService.clients.push(clientData);
 
     // Step 4: prepare SSE channel to the client
     response.writeHead(200, sse.headers);
@@ -165,7 +108,7 @@ const reserveCake = async (request: Request, response: Response) => {
     // Step 3: check image in the request body
     const imageFile = request.file;
     if (imageFile) {
-        const imageName = await processReservationBodyImage(
+        const imageName = await imageFileService.processReservationBodyImage(
             imageFile,
             clientId
         );
@@ -178,7 +121,7 @@ const reserveCake = async (request: Request, response: Response) => {
         reservationBody,
         status: 'initialized'
     };
-    clients.push(clientData);
+    clientsService.clients.push(clientData);
 
     // Step 5: respond with redirect to GET /reserve with the generated client ID
     response.redirect(303, '/reserve/' + clientId);
@@ -200,11 +143,11 @@ const reserveCake = async (request: Request, response: Response) => {
  */
 const reserveCakeSse = (request: Request, response: Response): void => {
     // Step 6: check that the request has headers "Accept: text/event-stream" needed for SSE
-    checkAcceptHeaders(request);
+    validators.checkAcceptHeaders(request);
 
     // Step 7: check that the client ID is valid
     const clientId = request.params.id;
-    const foundClient = getClient(clientId) as ClientDataForPost;
+    const foundClient = clientsService.getClient(clientId) as ClientDataForPost;
 
     // Step 8: prepare SSE channel to the client
     response.writeHead(200, sse.headers);
@@ -252,8 +195,8 @@ const getTodaysBirthdayPeople = async (
 
 export default {
     checkCakeStock,
-    reserveCakeSse,
     reserveCake,
+    reserveCakeSse,
     getTodaysDeliveries,
     getTodaysBirthdayPeople
 };
