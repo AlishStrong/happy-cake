@@ -175,8 +175,16 @@ docker build --target dev -t jobilla-dev .
 
 To run this `jobilla-dev` image with container name `jobilla-dev` (assuming you have a **Windows** device):
 
+**Git Bash terminal**
+
+```bash
+docker run -p 3000:3000 -v /$PWD/src:/app/src -v /$PWD/images:/app/images --name jobilla-dev jobilla-dev npm run dev
 ```
-docker run -p 3000:3000 -v /$PWD/src:/app/src -v /$PWD/images:/app/images --name jobilla-dev jobilla-dev
+
+**Windows CMD terminal**
+
+```cmd
+docker run -p 3000:3000 -v %cd%/src:/app/src -v %cd%/images:/app/images --name jobilla-dev jobilla-dev npm run dev
 ```
 
 To create a **production** image tagged `jobilla-prod`:
@@ -187,6 +195,14 @@ docker build --target prod -t jobilla-prod .
 
 To run this `jobilla-prod` image with container name `jobilla-prod`:
 
+**Git Bash terminal**
+
+```bash
+docker run -p 3000:3000 -v /$PWD/images:/app/images --name jobilla-prod jobilla-prod npm run prod
 ```
-docker run -p 3000:3000 -v /$PWD/images:/app/images --name jobilla-prod jobilla-prod
+
+**Windows CMD terminal**
+
+```cmd
+docker run -p 3000:3000 -v %cd%/images:/app/images --name jobilla-prod jobilla-prod npm run prod
 ```
